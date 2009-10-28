@@ -1,6 +1,6 @@
 from django.conf import settings
-from django.shortcuts import render_to_response
-from django.http import HttpResponseRedirect, HttpResponseForbidden, Http404
+from django.shortcuts import render_to_response, get_object_or_404
+from django.http import HttpResponseRedirect, HttpResponseForbidden, HttpResponseNotFound, Http404
 from django.db.models import Q
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
@@ -11,7 +11,8 @@ from django.contrib.auth.decorators import login_required
 from django.db import models
 
 from account.utils import get_default_redirect
-from account.models import OtherServiceInfo
+from account.models import OtherServiceInfo, PasswordReset
+
 from account.forms import SignupForm, AddEmailForm, LoginForm, \
     ChangePasswordForm, SetPasswordForm, ResetPasswordForm, \
     ChangeTimezoneForm, ChangeLanguageForm, TwitterForm, ResetPasswordKeyForm
@@ -190,15 +191,21 @@ def password_reset(request, form_class=ResetPasswordForm,
         "password_reset_form": password_reset_form,
     }, context_instance=RequestContext(request))
     
+import logging
 def password_reset_from_key(request, key, form_class=ResetPasswordKeyForm,
         template_name="account/password_reset_from_key.html"):
+    
+    # NOTE: this breaks if there are duplicate password resets with the same key.
+    # This is intentional.  Merge in the branch 513-itemized-email to fix it.
+    password_reset = get_object_or_404(PasswordReset, temp_key=key, reset=False)
+    
     if request.method == "POST":
         password_reset_key_form = form_class(request.POST)
         if password_reset_key_form.is_valid():
             password_reset_key_form.save()
             password_reset_key_form = None
     else:
-        password_reset_key_form = form_class(initial={"temp_key": key})
+        password_reset_key_form = form_class(initial={'temp_key' :key})
     
     return render_to_response(template_name, {
         "form": password_reset_key_form,
