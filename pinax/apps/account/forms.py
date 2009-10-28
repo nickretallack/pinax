@@ -1,4 +1,5 @@
 import re
+from random import random
 
 from django import forms
 from django.template.loader import render_to_string
@@ -258,11 +259,8 @@ class ResetPasswordForm(forms.Form):
     
     def save(self):
         for user in User.objects.filter(email__iexact=self.cleaned_data["email"]):
-            temp_key = sha_constructor("%s%s%s" % (
-                settings.SECRET_KEY,
-                user.email,
-                settings.SECRET_KEY,
-            )).hexdigest()
+            salt = sha_constructor(str(random())).hexdigest()[:5]
+            temp_key = sha_constructor(salt + self.cleaned_data['email']).hexdigest()
             
             # save it to the password reset model
             password_reset = PasswordReset(user=user, temp_key=temp_key)
