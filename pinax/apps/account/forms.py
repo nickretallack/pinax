@@ -286,13 +286,6 @@ class ResetPasswordKeyForm(forms.Form):
     
     password1 = forms.CharField(label=_("New Password"), widget=forms.PasswordInput(render_value=False))
     password2 = forms.CharField(label=_("New Password (again)"), widget=forms.PasswordInput(render_value=False))
-    temp_key = forms.CharField(widget=forms.HiddenInput)
-    
-    def clean_temp_key(self):
-        temp_key = self.cleaned_data.get("temp_key")
-        if not PasswordReset.objects.filter(temp_key=temp_key, reset=False).count() == 1:
-            raise forms.ValidationError(_("Temporary key is invalid."))
-        return temp_key
     
     def clean_password2(self):
         if "password1" in self.cleaned_data and "password2" in self.cleaned_data:
@@ -300,9 +293,8 @@ class ResetPasswordKeyForm(forms.Form):
                 raise forms.ValidationError(_("You must type the same password each time."))
         return self.cleaned_data["password2"]
     
-    def save(self):
+    def save(self, temp_key):
         # get the password_reset object
-        temp_key = self.cleaned_data.get("temp_key")
         password_reset = PasswordReset.objects.get(temp_key__exact=temp_key)
         
         # now set the new user password

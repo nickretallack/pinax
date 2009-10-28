@@ -202,7 +202,7 @@ def password_reset_from_key(request, key, form_class=ResetPasswordKeyForm,
     if request.method == "POST":
         password_reset_key_form = form_class(request.POST)
         if password_reset_key_form.is_valid():
-            password_reset_key_form.save()
+            password_reset_key_form.save(key)
             password_reset_key_form = None
     else:
         password_reset_key_form = form_class(initial={'temp_key' :key})
