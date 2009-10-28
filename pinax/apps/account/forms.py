@@ -1,4 +1,5 @@
 import re
+from random import random
 
 from django import forms
 from django.template.loader import render_to_string
@@ -20,6 +21,7 @@ from account.models import Account
 from timezones.forms import TimeZoneField
 
 from account.models import PasswordReset
+
 
 
 alnum_re = re.compile(r'^\w+$')
@@ -257,28 +259,34 @@ class ResetPasswordForm(forms.Form):
         return self.cleaned_data["email"]
     
     def save(self):
-        for user in User.objects.filter(email__iexact=self.cleaned_data["email"]):
-            temp_key = sha_constructor("%s%s%s" % (
-                settings.SECRET_KEY,
-                user.email,
-                settings.SECRET_KEY,
-            )).hexdigest()
-            
+        users = User.objects.filter(email__iexact=self.cleaned_data["email"])
+        
+        password_resets = []
+        for user in users:
+            # This was lifted from django-email-confirmation.
+            # Please re-work this if some other behavior is required.
+            salt = sha_constructor(str(random())).hexdigest()[:5]
+            temp_key = sha_constructor(salt + self.cleaned_data['email']).hexdigest()
+
             # save it to the password reset model
             password_reset = PasswordReset(user=user, temp_key=temp_key)
             password_reset.save()
-            
-            current_site = Site.objects.get_current()
-            domain = unicode(current_site.domain)
-            
-            #send the password reset email
-            subject = _("Password reset email sent")
-            message = render_to_string("account/password_reset_key_message.txt", {
-                "user": user,
-                "temp_key": temp_key,
-                "domain": domain,
-            })
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], priority="high")
+            password_resets.append(password_reset)
+        
+        current_site = Site.objects.get_current()
+        domain = unicode(current_site.domain)
+        
+        #send an email listing all the available password resets and their user accounts.
+        subject = _("Password reset email sent")
+        message = render_to_string("account/password_reset_key_message.txt", {
+            "users": users,
+            "resets": password_resets,
+            "site":current_site,
+            "domain": domain,
+        })
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], priority="high")
+
+
         return self.cleaned_data["email"]
 
 
@@ -303,7 +311,7 @@ class ResetPasswordKeyForm(forms.Form):
     def save(self):
         # get the password_reset object
         temp_key = self.cleaned_data.get("temp_key")
-        password_reset = PasswordReset.objects.get(temp_key__exact=temp_key)
+        password_reset = PasswordReset.objects.get(temp_key__exact=temp_key, reset=False)
         
         # now set the new user password
         user = User.objects.get(passwordreset__exact=password_reset)

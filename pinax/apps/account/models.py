@@ -103,7 +103,7 @@ class PasswordReset(models.Model):
 
     user = models.ForeignKey(User, verbose_name=_('user'))
 
-    temp_key = models.CharField(_('temp_key'), max_length=100)
+    temp_key = models.CharField(_('temp_key'), max_length=100, primary_key=True)
     timestamp = models.DateTimeField(_('timestamp'), default=datetime.now)
     reset = models.BooleanField(_('reset yet?'), default=False)
 
